@@ -1,5 +1,5 @@
 import { Input } from "@heroui/input";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { SearchIcon } from "./icons";
 
@@ -19,28 +19,41 @@ const SearchForm = ({
   autoSearchDelay = 0, // 默认不自动搜索
 }: SearchInputProps) => {
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 当外部的 searchTerm 改变时，更新本地的 searchTerm
   useEffect(() => {
     setLocalSearchTerm(searchTerm);
   }, [searchTerm]);
 
+  useEffect(
+    () => () => {
+      if (searchTimer.current) {
+        clearTimeout(searchTimer.current);
+      }
+    },
+    [],
+  );
+
   // 处理搜索输入变化并支持自动搜索
   const handleSearchChange = (value: string) => {
     setLocalSearchTerm(value);
     setSearchTerm(value);
 
+    if (searchTimer.current) {
+      clearTimeout(searchTimer.current);
+    }
+
     // 如果设置了自动搜索延迟，启用防抖自动搜索
     if (autoSearchDelay > 0) {
-      const timer = setTimeout(() => {
+      searchTimer.current = setTimeout(() => {
+        searchTimer.current = null;
         const syntheticEvent = {
           preventDefault: () => {},
         } as React.FormEvent;
 
         handleSearch(syntheticEvent);
       }, autoSearchDelay);
-
-      return () => clearTimeout(timer);
     }
   };
 
@@ -58,6 +71,10 @@ const SearchForm = ({
         variant="bordered"
         onChange={(e) => handleSearchChange(e.target.value)}
         onClear={() => {
+          if (searchTimer.current) {
+            clearTimeout(searchTimer.current);
+            searchTimer.current = null;
+          }
           setLocalSearchTerm("");
           setSearchTerm("");
         }}

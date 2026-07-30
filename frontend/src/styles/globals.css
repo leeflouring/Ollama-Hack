@@ -1,3 +1,94 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(
+        circle at 15% 0%,
+        rgb(56 189 248 / 8%),
+        transparent 30rem
+      ),
+      radial-gradient(
+        circle at 85% 12%,
+        rgb(148 163 184 / 9%),
+        transparent 26rem
+      );
+    font-family:
+      "Segoe UI Variable",
+      "Segoe UI",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  a {
+    transition:
+      color 180ms ease,
+      background-color 180ms ease,
+      border-color 180ms ease,
+      opacity 180ms ease,
+      transform 180ms ease;
+  }
+
+  button:active,
+  a:active {
+    transform: translateY(1px);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--nextui-primary));
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: rgb(56 189 248 / 24%);
+  }
+}
+
+@layer components {
+  .app-shell {
+    isolation: isolate;
+  }
+
+  .skip-link {
+    @apply fixed left-4 top-4 z-50 -translate-y-24 rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground shadow-lg;
+  }
+
+  .skip-link:focus {
+    @apply translate-y-0;
+  }
+
+  .surface-panel {
+    @apply border border-default-200/70 bg-content1/75 shadow-none backdrop-blur-sm;
+    box-shadow: 0 20px 50px -36px rgb(15 23 42 / 45%);
+  }
+
+  .metric-number {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

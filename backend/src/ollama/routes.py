@@ -7,12 +7,22 @@ ollama_router = APIRouter(tags=["ollama"])
 
 
 @ollama_router.post(
-    "/{full_path:path}",
+    "/api/{proxy_path:path}",
     description="Forward request to best ollama endpoint for the model",
     response_description="Json response from the best ollama endpoint for the model",
 )
 @ollama_router.get(
-    "/{full_path:path}",
+    "/api/{proxy_path:path}",
+    description="Forward request to best ollama endpoint for the model",
+    response_description="Json response from the best ollama endpoint for the model",
+)
+@ollama_router.post(
+    "/v1/{proxy_path:path}",
+    description="Forward request to best ollama endpoint for the model",
+    response_description="Json response from the best ollama endpoint for the model",
+)
+@ollama_router.get(
+    "/v1/{proxy_path:path}",
     description="Forward request to best ollama endpoint for the model",
     response_description="Json response from the best ollama endpoint for the model",
 )

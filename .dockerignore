@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+.claude
+.codex
+.cursor
+.serena
+.trellis
+data
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.pyc
+backend/.venv
+frontend/dist
+frontend/node_modules

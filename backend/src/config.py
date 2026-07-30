@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings
 
 class DatabaseEngine(StrEnum):
     MYSQL = "mysql"
+    POSTGRESQL = "postgresql"
+    SQLITE = "sqlite"
 
 
 class LogLevels(StrEnum):
@@ -32,10 +34,14 @@ class AppConfig(BaseSettings):
 class DatabaseConfig(BaseSettings):
     engine: DatabaseEngine = DatabaseEngine.MYSQL
     host: str = "localhost"
-    port: int = 3306
+    port: int | None = None
     username: str = "ollama_hack"
     password: str = "0llama_H4ck"
     db: str = "ollama_hack"
+    pool_size: int = 5
+    max_overflow: int = 10
+    pool_timeout: int = 30
+    pool_recycle: int = 1800
 
 
 class Config(BaseSettings):

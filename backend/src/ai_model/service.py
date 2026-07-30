@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi_pagination import Page, Params, set_page
 from fastapi_pagination.ext.sqlmodel import apaginate
-from sqlalchemy import and_, exists, func, or_
+from sqlalchemy import and_, case, exists, func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 
@@ -27,7 +27,7 @@ async def get_ai_models(
     Get all AI models with filtering, searching and sorting.
     """
     set_page(Page[AIModelDB])
-    query = select(AIModelDB).options(selectinload(AIModelDB.endpoint_links))  # type: ignore
+    query = select(AIModelDB)
 
     # 添加搜索条件
     if params.search:
@@ -64,17 +64,37 @@ async def get_ai_models(
     return await apaginate(session, query, params)
 
 
+async def get_endpoint_counts(
+    session: DBSessionDep, ai_model_ids: list[int]
+) -> dict[int, tuple[int, int]]:
+    if not ai_model_ids:
+        return {}
+
+    result = await session.execute(
+        select(
+            EndpointAIModelDB.ai_model_id,
+            func.count(),
+            func.coalesce(
+                func.sum(
+                    case((EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE, 1), else_=0)
+                ),
+                0,
+            ),
+        )
+        .where(col(EndpointAIModelDB.ai_model_id).in_(ai_model_ids))
+        .group_by(EndpointAIModelDB.ai_model_id)
+    )
+    return {
+        model_id: (int(total_count), int(available_count))
+        for model_id, total_count, available_count in result.all()
+    }
+
+
 async def get_endpoint_count(session: DBSessionDep, ai_model_id: int) -> tuple[int, int]:
     """
     Get the count of endpoints for an AI model.
     """
-    query = select(func.count()).where(EndpointAIModelDB.ai_model_id == ai_model_id)
-    result = await session.execute(query)
-    total_endpoint_count = result.scalar_one()
-    query = query.where(EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE)
-    result = await session.execute(query)
-    avaliable_endpoint_count = result.scalar_one()
-    return total_endpoint_count, avaliable_endpoint_count
+    return (await get_endpoint_counts(session, [ai_model_id])).get(ai_model_id, (0, 0))
 
 
 async def get_ai_models_endpoint_counts(
@@ -87,13 +107,14 @@ async def get_ai_models_endpoint_counts(
 
     set_page(Page[AIModelInfoWithEndpointCount])
 
+    model_ids = [ai_model.id for ai_model in ai_models.items if ai_model.id is not None]
+    endpoint_counts = await get_endpoint_counts(session, model_ids)
+
     ai_models_with_endpoint_count = []
     for ai_model in ai_models.items:
         if ai_model.id is None:
             continue
-        total_endpoint_count, avaliable_endpoint_count = await get_endpoint_count(
-            session, ai_model.id
-        )
+        total_endpoint_count, avaliable_endpoint_count = endpoint_counts.get(ai_model.id, (0, 0))
         ai_models_with_endpoint_count.append(
             AIModelInfoWithEndpointCount(
                 id=ai_model.id,

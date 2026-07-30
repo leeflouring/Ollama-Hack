@@ -3,16 +3,16 @@ from typing import List, Optional
 
 from sqlmodel import Field, Relationship
 
-from src.database import SQLModel
+from src.database import UTC_DATETIME, SQLModel
 from src.utils import now
 
 
 class UserDB(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     is_admin: bool = Field(default=False)
-    username: str
+    username: str = Field(index=True)
     password: str
-    created_at: datetime.datetime = Field(default_factory=now)
+    created_at: datetime.datetime = Field(default_factory=now, sa_type=UTC_DATETIME)
 
     # Add plan relationship
     plan_id: Optional[int] = Field(default=None, foreign_key="plan.id")

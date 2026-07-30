@@ -81,6 +81,7 @@ const DashboardLayout = ({
   const ThemeSwitch = () => (
     <div className="flex items-center gap-2">
       <Switch
+        aria-label="切换深浅主题"
         color="primary"
         isSelected={theme === "dark"}
         size="sm"
@@ -97,19 +98,29 @@ const DashboardLayout = ({
   );
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="app-shell flex min-h-[100dvh] flex-col">
+      <a className="skip-link" href="#main-content">
+        跳至主要内容
+      </a>
       {/* 主内容区域 */}
       <div className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto">
         {/* 导航栏 */}
-        <Navbar isBordered onMenuOpenChange={setIsMenuOpen}>
+        <Navbar
+          className="border-b border-default-200/60 bg-background/80 backdrop-blur-xl"
+          onMenuOpenChange={setIsMenuOpen}
+        >
           <NavbarContent>
             <NavbarMenuToggle
-              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+              aria-label={isMenuOpen ? "关闭菜单" : "打开菜单"}
               className="sm:hidden"
             />
-            <NavbarBrand>
-              <LogoIcon className="w-8 h-8" />
-              <h2 className="font-bold">Ollama Hack</h2>
+            <NavbarBrand className="gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                <LogoIcon className="h-6 w-6" />
+              </span>
+              <h2 className="text-base font-semibold tracking-tight">
+                Ollama Hack
+              </h2>
             </NavbarBrand>
           </NavbarContent>
 
@@ -121,7 +132,14 @@ const DashboardLayout = ({
                     key={item.href}
                     isActive={item.href === current_root_href}
                   >
-                    <Link href={item.href}>
+                    <Link
+                      className={
+                        item.href === current_root_href
+                          ? "font-semibold text-primary"
+                          : "font-medium text-default-500 hover:text-foreground"
+                      }
+                      href={item.href}
+                    >
                       <span>{item.label}</span>
                     </Link>
                   </NavbarItem>
@@ -142,6 +160,7 @@ const DashboardLayout = ({
                     avatarProps={{
                       name: user?.username || "用户",
                     }}
+                    className="cursor-pointer"
                     description={isAdmin ? "管理员" : "用户"}
                     name={user?.username || "用户"}
                   />
@@ -192,7 +211,11 @@ const DashboardLayout = ({
             </NavbarMenuItem>
           </NavbarMenu>
         </Navbar>
-        <main className="flex-1 p-2 lg:p-8 lg:pl-24 lg:pr-24 md:p-4 md:pl-12 md:pr-12 sm:p-2 sm:pl-8 sm:pr-8">
+        <main
+          className="relative mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
+          id="main-content"
+          tabIndex={-1}
+        >
           {children}
         </main>
         <Footer />

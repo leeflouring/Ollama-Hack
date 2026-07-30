@@ -5,7 +5,7 @@ from typing import Self
 from pydantic import model_validator
 from sqlmodel import Field
 
-from src.database import SQLModel
+from src.database import UTC_DATETIME, SQLModel
 from src.utils import now
 
 
@@ -16,7 +16,7 @@ class SystemSettingKey(str, Enum):
 class SystemSettings(SQLModel, table=True):
     key: SystemSettingKey = Field(primary_key=True)
     value: str
-    created_at: datetime.datetime = Field(default_factory=now, nullable=False)
+    created_at: datetime.datetime = Field(default_factory=now, nullable=False, sa_type=UTC_DATETIME)
 
     def validate_value(self) -> None:
         if self.key == SystemSettingKey.UPDATE_ENDPOINT_TASK_INTERVAL_HOURS:

@@ -1,4 +1,4 @@
-import { Card, CardHeader } from "@heroui/card";
+import { Card } from "@heroui/card";
 import { Progress } from "@heroui/progress";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,6 @@ import {
   ApiError,
 } from "@/types";
 import DashboardLayout from "@/layouts/Main";
-import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorDisplay from "@/components/ErrorDisplay";
 
 const DashboardPage = () => {
@@ -128,8 +127,12 @@ const DashboardPage = () => {
   if (isLoading) {
     return (
       <DashboardLayout current_root_href="/">
-        <div className="flex justify-center items-center h-64">
-          <LoadingSpinner size="large" />
+        <div aria-busy="true" aria-label="正在加载控制台" className="space-y-6">
+          <div className="h-48 animate-pulse rounded-[2rem] bg-default-200/60" />
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="h-56 animate-pulse rounded-3xl bg-default-200/60" />
+            <div className="h-56 animate-pulse rounded-3xl bg-default-200/60" />
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -139,131 +142,139 @@ const DashboardPage = () => {
     <DashboardLayout current_root_href="/">
       {error && <ErrorDisplay error={getErrorForDisplay()} />}
 
-      {/* 欢迎卡片 */}
-      <Card className="mb-6 p-6">
-        <h2 className="text-xl font-semibold mb-2">
-          👋 你好, {user?.username}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          欢迎使用 Ollama Hack 平台，这里可以管理你的 Ollama 端点和 AI 模型。
-        </p>
-      </Card>
+      <section
+        aria-labelledby="dashboard-title"
+        className="relative mb-8 overflow-hidden rounded-[2rem] border border-default-200/70 bg-content1/70 px-6 py-9 shadow-none backdrop-blur-sm sm:px-10 sm:py-12"
+      >
+        <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative max-w-2xl">
+          <p className="mb-3 text-sm font-semibold tracking-[0.16em] text-primary">
+            运行概览
+          </p>
+          <h1
+            className="text-balance text-3xl font-semibold tracking-[-0.04em] sm:text-5xl"
+            id="dashboard-title"
+          >
+            你好，{user?.username}
+          </h1>
+          <p className="mt-4 max-w-xl text-pretty leading-7 text-default-500">
+            在一个控制台内查看 Ollama 端点健康状态、模型可用性和当前请求配额。
+          </p>
+        </div>
+      </section>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card className="p-6">
-          <CardHeader className="p-0">
-            <h3 className="text-primary-400 text-lg font-bold">端点</h3>
-          </CardHeader>
-          <p className="text-3xl font-bold">{endpoints?.total || 0}</p>
-          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-2">
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card className="surface-panel rounded-3xl p-7">
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-semibold text-default-500">端点</p>
+              <p className="metric-number mt-2 text-5xl font-semibold">
+                {endpoints?.total || 0}
+              </p>
+            </div>
+            <span className="rounded-xl bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+              ENDPOINTS
+            </span>
+          </div>
+          <p className="mb-3 text-sm font-medium text-default-500">
             已添加的端点总数
           </p>
-          <div className="flex flex-col gap-2 justify-center">
+          <div className="flex flex-col justify-center gap-3">
             <Progress
+              aria-label="可用端点比例"
               color="primary"
               formatOptions={{ style: "percent", maximumFractionDigits: 0 }}
-              maxValue={endpoints?.total || 0}
-              value={availableEndpoints?.total || 0}
+              maxValue={100}
+              value={
+                endpoints?.total
+                  ? ((availableEndpoints?.total || 0) / endpoints.total) * 100
+                  : 0
+              }
             />
-            <div className="flex flex-row gap-2 justify-between">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex flex-row justify-between gap-2">
+              <span className="text-sm font-medium text-default-500">
                 可用端点
               </span>
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <span className="tabular-nums text-sm font-semibold">
                 {availableEndpoints?.total || 0} / {endpoints?.total || 0}
               </span>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <CardHeader className="p-0">
-            <h3 className="text-success-400 text-lg font-bold">AI 模型</h3>
-          </CardHeader>
-          <p className="text-3xl font-bold">{models?.total || 0}</p>
-          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-2">
+        <Card className="surface-panel rounded-3xl p-7 md:translate-y-4">
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <p className="text-sm font-semibold text-default-500">AI 模型</p>
+              <p className="metric-number mt-2 text-5xl font-semibold">
+                {models?.total || 0}
+              </p>
+            </div>
+            <span className="rounded-xl bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+              MODELS
+            </span>
+          </div>
+          <p className="mb-3 text-sm font-medium text-default-500">
             扫描出的 AI 模型总数
           </p>
-          <div className="flex flex-col gap-2 justify-center">
+          <div className="flex flex-col justify-center gap-3">
             <Progress
-              color="success"
+              aria-label="可用 AI 模型比例"
+              color="primary"
               formatOptions={{ style: "percent", maximumFractionDigits: 0 }}
-              maxValue={models?.total || 0}
-              value={availableModels?.total || 0}
+              maxValue={100}
+              value={
+                models?.total
+                  ? ((availableModels?.total || 0) / models.total) * 100
+                  : 0
+              }
             />
-            <div className="flex flex-row gap-2 justify-between">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex flex-row justify-between gap-2">
+              <span className="text-sm font-medium text-default-500">
                 可用 AI 模型
               </span>
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              <span className="tabular-nums text-sm font-semibold">
                 {availableModels?.total || 0} / {models?.total || 0}
               </span>
             </div>
           </div>
         </Card>
-        {/* {isAdmin && (
-          <Card className="p-6">
-            <CardHeader className="p-0">
-              <h3 className="text-primary-300 text-lg font-bold">用户</h3>
-            </CardHeader>
-            <p className="text-3xl font-bold">{users?.total || 0}</p>
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-2">
-              已注册用户总数
-            </p>
-            <div className="flex flex-col gap-2 justify-center">
-              <Progress
-                color="primary"
-                formatOptions={{ style: "percent", maximumFractionDigits: 0 }}
-                maxValue={users?.total || 0}
-                value={users?.total || 0}
-              />
-              <div className="flex flex-row gap-2 justify-between">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  已注册用户
-                </span>
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {users?.total || 0} / {users?.total || 0}
-                </span>
-              </div>
-            </div>
-          </Card>
-        )} */}
       </div>
 
       {/* 当前计划 */}
       {userPlan && (
-        <Card className="mb-6 p-6">
-          <h3 className="font-semibold text-lg mb-4">当前计划</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">
-                计划名称：
-              </span>
-              <span className="font-medium">{userPlan.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">
-                每分钟请求数限制：
-              </span>
-              <span className="font-medium">{userPlan.rpm}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">
-                每天请求数限制：
-              </span>
-              <span className="font-medium">{userPlan.rpd}</span>
-            </div>
-            {userPlan.description && (
-              <div className="pt-2">
-                <span className="text-gray-600 dark:text-gray-400">
-                  计划描述：
-                </span>
-                <p className="mt-1">{userPlan.description}</p>
-              </div>
-            )}
+        <section
+          aria-labelledby="plan-title"
+          className="surface-panel grid gap-8 rounded-3xl p-7 md:grid-cols-[1.2fr_1fr] md:p-9"
+        >
+          <div>
+            <p className="text-sm font-semibold text-primary">当前计划</p>
+            <h2
+              className="mt-2 text-2xl font-semibold tracking-tight"
+              id="plan-title"
+            >
+              {userPlan.name}
+            </h2>
+            <p className="mt-3 max-w-xl text-pretty leading-7 text-default-500">
+              {userPlan.description || "此计划定义了当前账号的请求速率上限。"}
+            </p>
           </div>
-        </Card>
+          <dl className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-default-100/70 p-4">
+              <dt className="text-sm text-default-500">每分钟请求</dt>
+              <dd className="metric-number mt-2 text-2xl font-semibold">
+                {userPlan.rpm}
+              </dd>
+            </div>
+            <div className="rounded-2xl bg-default-100/70 p-4">
+              <dt className="text-sm text-default-500">每天请求</dt>
+              <dd className="metric-number mt-2 text-2xl font-semibold">
+                {userPlan.rpd}
+              </dd>
+            </div>
+          </dl>
+        </section>
       )}
     </DashboardLayout>
   );

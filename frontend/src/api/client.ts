@@ -34,10 +34,8 @@ export const buildQueryString = (params: Record<string, any>): string => {
 
 export class ApiClient {
   private client: AxiosInstance;
-  private baseURL: string;
 
-  constructor(baseURL: string = "http://localhost:8000") {
-    this.baseURL = baseURL;
+  constructor(baseURL = "") {
     this.client = axios.create({
       baseURL,
       headers: {
@@ -158,9 +156,7 @@ export class ApiClient {
     return response.data;
   }
 }
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-
 // 创建默认客户端实例
-export const apiClient = new ApiClient(baseURL || "http://localhost:8000");
+export const apiClient = new ApiClient(import.meta.env.VITE_API_BASE_URL);
 
 export default apiClient;

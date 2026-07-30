@@ -37,20 +37,28 @@ Ollama-Hack 是一个用于管理、测试和转发 Ollama API 的服务。它�
 
 ### 方法一：使用 Docker 部署（推荐）
 
-如果你已安装 Docker 和 Docker Compose，可以使用以下命令一键启动：
+生产镜像同时包含前端和后端，容器内只运行 Uvicorn。默认 Compose 使用持久化
+SQLite 文件，无需额外数据库容器：
 
 ```bash
 # 下载 docker-compose.yml 文件
 curl -o docker-compose.yml https://raw.githubusercontent.com/timlzh/ollama-hack/main/docker-compose.example.yml
 
-# 修改 docker-compose.yml 文件中的密钥等敏感配置
+# 修改 APP__SECRET_KEY 等敏感配置
 vim docker-compose.yml
 
 # 启动服务
 docker compose up -d
 ```
 
-服务启动后，打开 http://localhost:3000/init 即可使用。
+数据保存在当前目录的 `./data/ollama-hack.db`。服务启动后，打开
+http://localhost:3000/init 即可使用。
+
+也可以从源码构建同一个镜像：
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
 
 ### 方法二：直接运行（开发环境）
 
@@ -124,7 +132,7 @@ Ollama-Hack 支持 Ollama 的全部 OpenAI 兼容 API，详细列表请参考：
 
 ### 环境变量
 
-在 docker-compose.yml 文件中，你可以通过以下环境变量自定义后端：
+应用支持 SQLite、PostgreSQL 和 MySQL。默认 SQLite 配置如下：
 
 ```yaml
 environment:
@@ -132,12 +140,51 @@ environment:
     - APP__LOG_LEVEL=INFO # 日志级别
     - APP__SECRET_KEY=change_this_key # JWT密钥
     - APP__ACCESS_TOKEN_EXPIRE_MINUTES=30 # 访问令牌过期时间
-    - DATABASE__ENGINE=mysql # 数据库引擎
-    - DATABASE__HOST=db # 数据库主机
-    - DATABASE__USERNAME=user # 数据库用户名
-    - DATABASE__PASSWORD=password # 数据库密码
-    - DATABASE__DB=ollama_hack # 数据库名称
+    - DATABASE__ENGINE=sqlite
+    - DATABASE__DB=/data/ollama-hack.db
 ```
+
+使用外部 PostgreSQL：
+
+```yaml
+environment:
+    - DATABASE__ENGINE=postgresql
+    - DATABASE__HOST=postgres
+    - DATABASE__PORT=5432
+    - DATABASE__USERNAME=ollama_hack
+    - DATABASE__PASSWORD=change_this_password
+    - DATABASE__DB=ollama_hack
+    - DATABASE__POOL_SIZE=5
+    - DATABASE__MAX_OVERFLOW=10
+```
+
+现有 MySQL 配置继续兼容：
+
+```yaml
+environment:
+    - DATABASE__ENGINE=mysql
+    - DATABASE__HOST=mysql
+    - DATABASE__PORT=3306
+    - DATABASE__USERNAME=ollama_hack
+    - DATABASE__PASSWORD=change_this_password
+    - DATABASE__DB=ollama_hack
+    - DATABASE__POOL_SIZE=5
+    - DATABASE__MAX_OVERFLOW=10
+```
+
+应用启动时会创建缺失的表和声明式索引。大型现有数据库首次升级时，创建索引可能
+短暂锁表，建议安排维护窗口。应用不会在 SQLite、PostgreSQL 和 MySQL 之间自动
+迁移或复制数据；切换数据库前请自行完成备份和迁移。
+
+### GitHub 自动构建镜像
+
+仓库包含 `.github/workflows/docker-build.yml`。代码推送到 `main`、`master`、
+`workflow-dev` 或 `dev`，或推送 `v*.*.*` 标签后，GitHub Actions 会自动构建
+`linux/amd64` 与 `linux/arm64` 的统一镜像，并始终发布到 GHCR。
+
+GHCR 使用仓库自带的 `GITHUB_TOKEN`，无需额外配置。如需同时发布到 DockerHub，
+在仓库的 Actions Secrets 中配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`
+即可。也可以从 Actions 页面手动触发该工作流。
 
 ## 👤 作者
 

@@ -192,11 +192,13 @@ async def send_request_to_endpoints(
 
 
 async def request_forwarding(
-    full_path: str, request_raw: Request, session: DBSessionDep
+    request_raw: Request, session: DBSessionDep
 ) -> StreamingResponse | PlainTextResponse | JSONResponse:
+    full_path = request_raw.url.path.lstrip("/")
+    if full_path == "api/v2" or full_path.startswith("api/v2/"):
+        raise HTTPException(status_code=404, detail="Not found")
+
     match full_path.strip("/"):
-        case "":
-            return PlainTextResponse("Hello, World!")
         case "api/tags":
             return JSONResponse(await get_tags(session))
         case "v1/models":

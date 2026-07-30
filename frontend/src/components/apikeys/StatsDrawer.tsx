@@ -7,7 +7,6 @@ import {
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Divider } from "@heroui/divider";
 import { Tooltip } from "@heroui/tooltip";
-import React, { useEffect } from "react";
 import { Button } from "@heroui/button";
 
 import { LeftArrowIcon } from "../icons";
@@ -38,19 +37,11 @@ const ApiKeyStatsDrawer = ({
     data: stats,
     isLoading,
     error,
-    refetch,
   } = useCustomQuery<ApiKeyUsageStats>(
     ["apikey-stats", id],
     () => apiKeyApi.getApiKeyStats(Number(id)),
     { staleTime: 30000, enabled: !!id && isOpen },
   );
-
-  // 在抽屉打开时重新获取数据
-  useEffect(() => {
-    if (isOpen && id) {
-      refetch();
-    }
-  }, [isOpen, id, refetch]);
 
   // 渲染抽屉内容
   const renderContent = () => {

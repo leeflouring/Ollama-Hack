@@ -2,9 +2,10 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import Index
 from sqlmodel import Column, Field, Relationship
 
-from src.database import LONGTEXT, SQLModel
+from src.database import LONGTEXT, UTC_DATETIME, SQLModel
 from src.utils import now
 
 if TYPE_CHECKING:
@@ -19,6 +20,11 @@ class AIModelStatusEnum(str, Enum):
 
 
 class EndpointAIModelDB(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_endpoint_ai_model_endpoint_status", "endpoint_id", "status"),
+        Index("ix_endpoint_ai_model_model_status", "ai_model_id", "status"),
+    )
+
     endpoint_id: int = Field(foreign_key="endpoint.id", primary_key=True)
     ai_model_id: int = Field(foreign_key="ai_model.id", primary_key=True)
 
@@ -41,10 +47,12 @@ class EndpointAIModelDB(SQLModel, table=True):
 
 
 class AIModelDB(SQLModel, table=True):
+    __table_args__ = (Index("ix_ai_model_name_tag", "name", "tag"),)
+
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)  # deepseek-r1
     tag: str = Field(index=True)  # 32b
-    created_at: datetime = Field(default_factory=now)
+    created_at: datetime = Field(default_factory=now, sa_type=UTC_DATETIME)
 
     endpoint_links: list["EndpointAIModelDB"] = Relationship(
         back_populates="ai_model",
@@ -68,7 +76,7 @@ class AIModelPerformanceDB(SQLModel, table=True):
     total_time: float = Field(default=120, description="The total time of the request")
     output: str = Field(default="", sa_column=Column(LONGTEXT))
     output_tokens: int = Field(default=0)
-    created_at: datetime = Field(default_factory=now)
+    created_at: datetime = Field(default_factory=now, sa_type=UTC_DATETIME)
 
     endpoint_id: Optional[int] = Field(default=None, foreign_key="endpoint.id")
     ai_model_id: Optional[int] = Field(default=None, foreign_key="ai_model.id")

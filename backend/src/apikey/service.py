@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_pagination import Page, set_page
 from fastapi_pagination.ext.sqlmodel import apaginate
-from sqlalchemy import false, func, or_
+from sqlalchemy import case, false, func, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 
@@ -266,7 +266,7 @@ async def check_rate_limits(
         )
 
     # Check RPD (requests per day)
-    today_start = datetime.datetime(_now.year, _now.month, _now.day)
+    today_start = _now.replace(hour=0, minute=0, second=0, microsecond=0)
     rpd_result = await session.execute(
         select(func.count())
         .select_from(ApiKeyUsageLogDB)
@@ -295,86 +295,58 @@ async def get_api_key_usage_stats(
     api_key = await get_api_key_by_id(session, api_key_id, user)
 
     _now = now()
-    today_start = datetime.datetime(_now.year, _now.month, _now.day)
+    today_start = _now.replace(hour=0, minute=0, second=0, microsecond=0)
     thirty_days_ago = _now - datetime.timedelta(days=30)
 
-    # Total requests
-    total_result = await session.execute(
-        select(func.count())
-        .select_from(ApiKeyUsageLogDB)
-        .where(ApiKeyUsageLogDB.api_key_id == api_key.id)
-    )
-    total_requests = total_result.scalar_one()
+    summary = (
+        await session.execute(
+            select(
+                func.count().label("total_requests"),
+                func.coalesce(
+                    func.sum(case((ApiKeyUsageLogDB.timestamp >= thirty_days_ago, 1), else_=0)),
+                    0,
+                ).label("last_30_days_requests"),
+                func.coalesce(
+                    func.sum(case((ApiKeyUsageLogDB.timestamp >= today_start, 1), else_=0)),
+                    0,
+                ).label("requests_today"),
+                func.coalesce(
+                    func.sum(case((ApiKeyUsageLogDB.status_code < 400, 1), else_=0)),
+                    0,
+                ).label("successful_requests"),
+                func.coalesce(
+                    func.sum(case((ApiKeyUsageLogDB.status_code >= 400, 1), else_=0)),
+                    0,
+                ).label("failed_requests"),
+            )
+            .select_from(ApiKeyUsageLogDB)
+            .where(ApiKeyUsageLogDB.api_key_id == api_key.id)
+        )
+    ).one()
 
-    # Last 30 days requests
-    month_result = await session.execute(
-        select(func.count())
-        .select_from(ApiKeyUsageLogDB)
+    daily_start = today_start - datetime.timedelta(days=29)
+    day_expression = func.date(ApiKeyUsageLogDB.timestamp)
+    daily_result = await session.execute(
+        select(day_expression, func.count())
         .where(
             ApiKeyUsageLogDB.api_key_id == api_key.id,
-            ApiKeyUsageLogDB.timestamp >= thirty_days_ago,
+            ApiKeyUsageLogDB.timestamp >= daily_start,
+            ApiKeyUsageLogDB.timestamp < today_start + datetime.timedelta(days=1),
         )
+        .group_by(day_expression)
     )
-    last_30_days_requests = month_result.scalar_one()
-
-    # Today's requests
-    today_result = await session.execute(
-        select(func.count())
-        .select_from(ApiKeyUsageLogDB)
-        .where(
-            ApiKeyUsageLogDB.api_key_id == api_key.id,
-            ApiKeyUsageLogDB.timestamp >= today_start,
-        )
-    )
-    requests_today = today_result.scalar_one()
-
-    # Successful requests (status code < 400)
-    success_result = await session.execute(
-        select(func.count())
-        .select_from(ApiKeyUsageLogDB)
-        .where(
-            ApiKeyUsageLogDB.api_key_id == api_key.id,
-            ApiKeyUsageLogDB.status_code < 400,
-        )
-    )
-    successful_requests = success_result.scalar_one()
-
-    # Failed requests (status code >= 400)
-    failed_result = await session.execute(
-        select(func.count())
-        .select_from(ApiKeyUsageLogDB)
-        .where(
-            ApiKeyUsageLogDB.api_key_id == api_key.id,
-            ApiKeyUsageLogDB.status_code >= 400,
-        )
-    )
-    failed_requests = failed_result.scalar_one()
-
-    # Requests per day in the last 30 days
+    daily_counts = {str(day): int(count) for day, count in daily_result.all()}
     daily_stats = []
     for i in range(30):
         day = _now - datetime.timedelta(days=i)
-        day_start = datetime.datetime(day.year, day.month, day.day)
-        day_end = day_start + datetime.timedelta(days=1)
-
-        day_result = await session.execute(
-            select(func.count())
-            .select_from(ApiKeyUsageLogDB)
-            .where(
-                ApiKeyUsageLogDB.api_key_id == api_key.id,
-                ApiKeyUsageLogDB.timestamp >= day_start,
-                ApiKeyUsageLogDB.timestamp < day_end,
-            )
-        )
-        count = day_result.scalar_one()
-
-        daily_stats.append({"date": day_start.strftime("%Y-%m-%d"), "count": count})
+        date = day.strftime("%Y-%m-%d")
+        daily_stats.append({"date": date, "count": daily_counts.get(date, 0)})
 
     return ApiKeyUsageStats(
-        total_requests=total_requests,
-        last_30_days_requests=last_30_days_requests,
-        requests_today=requests_today,
-        successful_requests=successful_requests,
-        failed_requests=failed_requests,
+        total_requests=summary.total_requests,
+        last_30_days_requests=summary.last_30_days_requests,
+        requests_today=summary.requests_today,
+        successful_requests=summary.successful_requests,
+        failed_requests=summary.failed_requests,
         requests_per_day=daily_stats,
     )

@@ -3,8 +3,8 @@ from typing import Optional
 
 from fastapi import BackgroundTasks, Depends, HTTPException, status
 from fastapi_pagination import Page, Params, set_page
-from fastapi_pagination.ext.sqlmodel import paginate as apaginate
-from sqlalchemy import func, insert
+from fastapi_pagination.ext.sqlmodel import apaginate
+from sqlalchemy import and_, case, func, insert
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, or_, select
 
@@ -22,6 +22,7 @@ from src.utils import now
 
 from .models import (
     EndpointDB,
+    EndpointPerformanceDB,
     EndpointTestTask,
 )
 from .schemas import (
@@ -131,7 +132,7 @@ async def get_endpoints(
         - order: Sort order (asc or desc)
     """
     set_page(Page[EndpointDB])
-    query = select(EndpointDB).options(selectinload(EndpointDB.performances))  # type: ignore
+    query = select(EndpointDB)
 
     # 添加搜索条件
     if params.search:
@@ -513,47 +514,96 @@ async def get_endpoints_with_ai_model_counts(
     Get all endpoints with AI model counts, with support for filtering, searching and sorting.
     """
     endpoints_page = await get_endpoints(session, filter_params)
+    endpoint_ids = [endpoint.id for endpoint in endpoints_page.items if endpoint.id is not None]
+
+    if not endpoint_ids:
+        return Page(
+            items=[],
+            total=endpoints_page.total,
+            page=endpoints_page.page,
+            size=endpoints_page.size,
+            pages=endpoints_page.pages,
+        )
+
+    count_result = await session.execute(
+        select(
+            EndpointAIModelDB.endpoint_id,
+            func.count(),
+            func.coalesce(
+                func.sum(
+                    case((EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE, 1), else_=0)
+                ),
+                0,
+            ),
+        )
+        .where(col(EndpointAIModelDB.endpoint_id).in_(endpoint_ids))
+        .group_by(EndpointAIModelDB.endpoint_id)
+    )
+    counts = {
+        endpoint_id: (int(total_count), int(available_count))
+        for endpoint_id, total_count, available_count in count_result.all()
+    }
+
+    latest_performance_dates = (
+        select(
+            EndpointPerformanceDB.endpoint_id,
+            func.max(EndpointPerformanceDB.created_at).label("created_at"),
+        )
+        .where(col(EndpointPerformanceDB.endpoint_id).in_(endpoint_ids))
+        .group_by(EndpointPerformanceDB.endpoint_id)
+        .subquery()
+    )
+    performance_result = await session.execute(
+        select(EndpointPerformanceDB).join(
+            latest_performance_dates,
+            and_(
+                EndpointPerformanceDB.endpoint_id == latest_performance_dates.c.endpoint_id,
+                EndpointPerformanceDB.created_at == latest_performance_dates.c.created_at,
+            ),
+        )
+    )
+    latest_performances = {
+        performance.endpoint_id: performance for performance in performance_result.scalars().all()
+    }
+
+    latest_task_dates = (
+        select(
+            EndpointTestTask.endpoint_id,
+            func.max(EndpointTestTask.scheduled_at).label("scheduled_at"),
+        )
+        .where(col(EndpointTestTask.endpoint_id).in_(endpoint_ids))
+        .group_by(EndpointTestTask.endpoint_id)
+        .subquery()
+    )
+    task_result = await session.execute(
+        select(EndpointTestTask).join(
+            latest_task_dates,
+            and_(
+                EndpointTestTask.endpoint_id == latest_task_dates.c.endpoint_id,
+                EndpointTestTask.scheduled_at == latest_task_dates.c.scheduled_at,
+            ),
+        )
+    )
+    latest_tasks = {task.endpoint_id: task for task in task_result.scalars().all()}
 
     endpoints_with_counts = []
-
     for endpoint in endpoints_page.items:
-        # Get the recent performances
-        recent_performances = endpoint.performances[:1] if endpoint.performances else []
-        endpoint_performances = [
-            EndpointPerformanceInfo(
-                id=perf.id,
-                status=perf.status,
-                ollama_version=perf.ollama_version,
-                created_at=perf.created_at,
-            )
-            for perf in recent_performances
-        ]
-
-        # Count total AI models
-        query = select(func.count()).where(EndpointAIModelDB.endpoint_id == endpoint.id)
-        result = await session.execute(query)
-        total_ai_model_count = result.scalar_one()
-
-        # Count available AI models
-        query = select(func.count()).where(
-            EndpointAIModelDB.endpoint_id == endpoint.id,
-            EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+        latest_performance = latest_performances.get(endpoint.id)
+        endpoint_performances = (
+            [
+                EndpointPerformanceInfo(
+                    id=latest_performance.id,
+                    status=latest_performance.status,
+                    ollama_version=latest_performance.ollama_version,
+                    created_at=latest_performance.created_at,
+                )
+            ]
+            if latest_performance
+            else []
         )
-        result = await session.execute(query)
-        avaliable_ai_model_count = result.scalar_one()
+        total_ai_model_count, avaliable_ai_model_count = counts.get(endpoint.id, (0, 0))
+        task = latest_tasks.get(endpoint.id)
 
-        query = (
-            select(EndpointTestTask)
-            .where(
-                EndpointTestTask.endpoint_id == endpoint.id,
-            )
-            .order_by(col(EndpointTestTask.scheduled_at).desc())
-        )
-        result = await session.execute(query)
-        task = result.scalars().first()
-        task_status = task.status if task else None
-
-        # Create the endpoint with counts
         endpoints_with_counts.append(
             EndpointWithAIModelCount(
                 id=endpoint.id,
@@ -564,7 +614,7 @@ async def get_endpoints_with_ai_model_counts(
                 recent_performances=endpoint_performances,
                 total_ai_model_count=total_ai_model_count,
                 avaliable_ai_model_count=avaliable_ai_model_count,
-                task_status=task_status,
+                task_status=task.status if task else None,
             )
         )
 

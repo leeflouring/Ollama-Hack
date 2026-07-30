@@ -59,8 +59,9 @@ import { DataTable } from "@/components/DataTable";
 import { useDialog } from "@/contexts/DialogContext";
 import { StatsDrawer } from "@/components/apikeys";
 
+SyntaxHighlighter.registerLanguage("bash", bash);
+
 const ApiKeysPage = () => {
-  SyntaxHighlighter.registerLanguage("bash", bash);
   const { theme } = useTheme();
   const { isAdmin } = useAuth();
   const { confirm } = useDialog();

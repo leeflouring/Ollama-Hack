@@ -8,7 +8,7 @@ import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Divider } from "@heroui/divider";
 import { Chip } from "@heroui/chip";
 import { Tooltip } from "@heroui/tooltip";
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@heroui/button";
 
 import { DeleteIcon, EditIcon, LeftArrowIcon } from "../icons";
@@ -51,19 +51,11 @@ const EndpointDetailDrawer = ({
     data: endpoint,
     isLoading,
     error,
-    refetch,
   } = useCustomQuery<EndpointWithAIModels>(
     ["endpoint-drawer", id, page, size],
     () => endpointApi.getEndpointById(Number(id), page, size),
     { staleTime: 30000, enabled: !!id && isOpen },
   );
-
-  // 在抽屉打开时重新获取数据
-  useEffect(() => {
-    if (isOpen && id) {
-      refetch();
-    }
-  }, [isOpen, id, refetch]);
 
   // 处理页码变化
   const handlePageChange = (newPage: number) => {

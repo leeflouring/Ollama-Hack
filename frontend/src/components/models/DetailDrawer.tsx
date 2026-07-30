@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Divider } from "@heroui/divider";
 import { Tooltip } from "@heroui/tooltip";
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@heroui/button";
 
 import { LeftArrowIcon } from "../icons";
@@ -41,19 +41,11 @@ const ModelDetailDrawer = ({ id, isOpen, onClose }: ModelDetailProps) => {
     data: model,
     isLoading,
     error,
-    refetch,
   } = useCustomQuery<AIModelInfoWithEndpoint>(
     ["model-drawer", id, page, size],
     () => aiModelApi.getAIModelById(Number(id), page, size),
     { staleTime: 30000, enabled: !!id && isOpen },
   );
-
-  // 在抽屉打开时重新获取数据
-  useEffect(() => {
-    if (isOpen && id) {
-      refetch();
-    }
-  }, [isOpen, id, refetch]);
 
   // 处理页码变化
   const handlePageChange = (newPage: number) => {

@@ -1,8 +1,11 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import bcrypt
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import Env, get_config
 from .database import create_db_and_tables, sessionmanager
@@ -68,9 +71,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
 app.include_router(router)
 
+if frontend_dir.is_dir():
+    assets_dir = frontend_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(full_path: str):
+        if full_path == "api" or full_path.startswith(("api/", "v1/")):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+        requested_file = (frontend_dir / full_path).resolve()
+        if requested_file.is_relative_to(frontend_dir) and requested_file.is_file():
+            return FileResponse(requested_file)
+        return FileResponse(frontend_dir / "index.html")
+else:
+
+    @app.get("/")
+    async def root():
+        return {"message": "Hello World"}
