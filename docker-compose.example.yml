@@ -1,15 +1,15 @@
 services:
   app:
-    image: timlzh/ollama-hack:latest
+    image: leeflouring/ollama-hack:main
     ports:
-      - "3000:8000"
+      - "3180:8000"
     environment:
       APP__ENV: prod
       APP__LOG_LEVEL: INFO
       APP__SECRET_KEY: change_this_to_a_secure_key
       APP__ALGORITHM: HS256
       APP__ACCESS_TOKEN_EXPIRE_MINUTES: 10080
-      APP__EXTERNAL_FEED_ENABLED: ${APP__EXTERNAL_FEED_ENABLED:-false}
+      APP__EXTERNAL_FEED_ENABLED: ${APP__EXTERNAL_FEED_ENABLED:-true}
       APP__EXTERNAL_FEED_URL: ${APP__EXTERNAL_FEED_URL:-https://raw.githubusercontent.com/forrany/Awesome-Ollama-Server/main/public/data.json}
       APP__EXTERNAL_FEED_INTERVAL_HOURS: ${APP__EXTERNAL_FEED_INTERVAL_HOURS:-10}
       DATABASE__ENGINE: sqlite
