@@ -41,13 +41,9 @@ Ollama-Hack 是一个用于管理、测试和转发 Ollama API 的服务。它�
 SQLite 文件，无需额外数据库容器：
 
 ```bash
-# 下载 docker-compose.yml 文件
-curl -o docker-compose.yml https://raw.githubusercontent.com/timlzh/ollama-hack/main/docker-compose.example.yml
-
-# 修改 APP__SECRET_KEY 等敏感配置
-vim docker-compose.yml
-
-# 启动服务
+git clone https://github.com/leeflouring/Ollama-Hack.git
+cd Ollama-Hack
+cp .env.example .env   
 docker compose up -d
 ```
 
