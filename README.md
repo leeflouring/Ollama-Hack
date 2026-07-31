@@ -43,7 +43,8 @@ SQLite 文件，无需额外数据库容器：
 ```bash
 git clone https://github.com/leeflouring/Ollama-Hack.git
 cd Ollama-Hack
-cp .env.example .env   
+cp .env.example .env
+cp docker-compose.example.yml docker-compose.yml 
 docker compose up -d
 ```
 
