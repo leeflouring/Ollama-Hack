@@ -176,6 +176,25 @@ environment:
 短暂锁表，建议安排维护窗口。应用不会在 SQLite、PostgreSQL 和 MySQL 之间自动
 迁移或复制数据；切换数据库前请自行完成备份和迁移。
 
+### 外部端点源（可选）
+
+可以选择从
+[Awesome-Ollama-Server](https://github.com/forrany/Awesome-Ollama-Server)
+的公开 JSON 数据源自动发现端点。此功能默认关闭：
+
+```dotenv
+APP__EXTERNAL_FEED_ENABLED=true
+APP__EXTERNAL_FEED_URL=https://raw.githubusercontent.com/forrany/Awesome-Ollama-Server/main/public/data.json
+APP__EXTERNAL_FEED_INTERVAL_HOURS=10
+```
+
+使用 Docker Compose 时，将 `.env.example` 复制为 `.env` 后修改以上配置即可。
+启用后，应用会在启动后及指定间隔下载数据源，只添加尚不存在的 HTTP/HTTPS
+端点，并使用本地测试流程重新获取状态、模型和性能；不会信任上游的这些字段，
+也不会更新、删除现有端点或覆盖自定义名称。导入后会向新端点发起测试请求，因此
+会产生访问第三方服务器的出站网络流量。关闭开关只停止后续同步，已经导入的端点
+仍由本地管理员正常管理。
+
 ## ⚡ 性能优化对比
 
 以下数据对比改造前后的同一代码路径，统计的是 SQL 语句数而非特定硬件上的响应

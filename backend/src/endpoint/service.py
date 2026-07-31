@@ -67,45 +67,51 @@ async def batch_create_or_update_endpoints(
     """
     Create or update multiple endpoints.
     """
-    # 提取所有 URL
     urls = [ep.url for ep in endpoint_batch.endpoints]
+    existing_ids, new_ids = await insert_missing_endpoints(session, urls)
+    all_ids = existing_ids + new_ids
 
-    # 1. 查询已存在的 URL
-    result = await session.execute(
-        select(EndpointDB.url, EndpointDB.id).where(col(EndpointDB.url).in_(urls))
-    )
-    existing = {row[0]: row[1] for row in result.all()}
-
-    # 2. 过滤出未存在的 URL
-    new_urls = [url for url in urls if url not in existing]
-
-    # 3. 批量插入新 URL
-    new_ids = []
-    if new_urls:
-        # 构建插入数据
-        new_urls = list(set(urls))
-        to_insert = [{"url": url, "name": url} for url in new_urls]
-        await session.execute(insert(EndpointDB).values(to_insert))
-        await session.commit()
-
-        # 查询新插入的记录的 ID
-        result = await session.execute(
-            select(EndpointDB.url, EndpointDB.id).where(col(EndpointDB.url).in_(new_urls))
-        )
-        new_ids = [row[1] for row in result.all()]
-
-    # 4. 合并所有 ID
-    all_ids = list(existing.values()) + new_ids
-
-    # 使用调度器为每个端点创建测试任务
     async def create_test_tasks():
         from .scheduler import get_scheduler
 
+        scheduler = get_scheduler()
         for eid in all_ids:
-            scheduler = get_scheduler()
             await scheduler.schedule_endpoint_test(eid, now() + timedelta(seconds=5))
 
     background_task.add_task(create_test_tasks)
+
+
+async def insert_missing_endpoints(
+    session: DBSessionDep,
+    urls: list[str],
+) -> tuple[list[int], list[int]]:
+    """Insert missing endpoint URLs without changing existing rows."""
+    unique_urls = list(dict.fromkeys(urls))
+    if not unique_urls:
+        return [], []
+
+    result = await session.execute(
+        select(EndpointDB.url, EndpointDB.id).where(col(EndpointDB.url).in_(unique_urls))
+    )
+    existing = dict(result.all())
+    new_urls = [url for url in unique_urls if url not in existing]
+
+    if new_urls:
+        await session.execute(
+            insert(EndpointDB).values([{"url": url, "name": url} for url in new_urls])
+        )
+        await session.commit()
+        result = await session.execute(
+            select(EndpointDB.url, EndpointDB.id).where(col(EndpointDB.url).in_(new_urls))
+        )
+        new = dict(result.all())
+    else:
+        new = {}
+
+    return (
+        [existing[url] for url in unique_urls if url in existing],
+        [new[url] for url in new_urls],
+    )
 
 
 async def get_endpoint_by_url(session: DBSessionDep, url: str) -> EndpointDB:

@@ -9,12 +9,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import delete, select
 from sqlmodel import col
 
+from src.config import get_config
 from src.database import sessionmanager
 from src.logging import get_logger
 from src.setting.models import SystemSettingKey
 from src.setting.service import get_setting
 from src.utils import now
 
+from .external_feed import sync_external_feed
 from .models import EndpointDB, EndpointTestTask, TaskStatus
 from .service import test_and_update_endpoint_and_models
 
@@ -69,6 +71,7 @@ class SchedulerService:
         # )
         await self.remove_interupted_tasks()
         await self.schedule_periodic_endpoint_updates(immediate=True)
+        self.schedule_external_feed_sync(immediate=True)
         self.scheduler.start()
         self.is_running = True
         logger.info("Scheduler service started")
@@ -156,6 +159,28 @@ class SchedulerService:
             next_run_time=now() + datetime.timedelta(seconds=10) if immediate else None,
         )
         logger.info(f"Scheduled periodic endpoint updates every {interval_hours} hours")
+
+    def schedule_external_feed_sync(self, immediate: bool = False) -> None:
+        app_config = get_config().app
+        if not app_config.external_feed_enabled:
+            return
+
+        if self.scheduler.get_job("external_feed_sync"):
+            self.scheduler.remove_job("external_feed_sync")
+
+        self.scheduler.add_job(
+            sync_external_feed,
+            "interval",
+            hours=app_config.external_feed_interval_hours,
+            id="external_feed_sync",
+            max_instances=1,
+            replace_existing=True,
+            next_run_time=now() + datetime.timedelta(seconds=5) if immediate else None,
+        )
+        logger.info(
+            "Scheduled external feed sync every %s hours",
+            app_config.external_feed_interval_hours,
+        )
 
     async def update_all_endpoints(self):
         """

@@ -1,6 +1,8 @@
 from enum import StrEnum
 from functools import lru_cache
+from typing import Self
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -29,6 +31,18 @@ class AppConfig(BaseSettings):
     secret_key: str = "0llama_H4ck"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    external_feed_enabled: bool = False
+    external_feed_url: str = (
+        "https://raw.githubusercontent.com/forrany/"
+        "Awesome-Ollama-Server/main/public/data.json"
+    )
+    external_feed_interval_hours: int = 10
+
+    @model_validator(mode="after")
+    def validate_external_feed_interval(self) -> Self:
+        if self.external_feed_enabled and self.external_feed_interval_hours <= 0:
+            raise ValueError("External feed interval must be greater than 0 when enabled")
+        return self
 
 
 class DatabaseConfig(BaseSettings):
