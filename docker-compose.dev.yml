@@ -17,5 +17,5 @@ services:
       DATABASE__ENGINE: sqlite
       DATABASE__DB: /data/ollama-hack.db
     volumes:
-      - ./data:/data
+      - ./data:/home/node/app/data
     restart: unless-stopped
