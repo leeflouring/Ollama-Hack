@@ -1,5 +1,7 @@
 ![logo](./assets/favicon.svg)
 
+[English](./README_EN.md) | **简体中文**
+
 # Ollama-Hack V2 🚀
 
 ## 📖 简介
@@ -17,7 +19,8 @@ Ollama-Hack 是一个用于管理、测试和转发 Ollama API 的服务。它�
 -   🔍 **端点详情**：查看每个端点的详细信息和可用模型
     ![端点详情](./assets/endpoint_details.png)
 -   🧩 **兼容 OpenAI API**：提供兼容 OpenAI 的 API 接口
--   ⚖️ **最优线路选择**：根据 Token/s 性能自动选择最优的 Ollama 端点
+-   ✅ **可用性筛选**：端点和模型列表支持全部、可用、不可用筛选
+-   ⚖️ **智能路由与故障切换**：仅选择端点和模型均可用的线路，按 TPS 从高到低转发，失败时自动尝试下一条线路
 -   🔑 **API 密钥管理**：生成和管理用于身份验证的 API 密钥
 -   📊 **性能监控**：测试和显示不同端点上模型的性能指标
 -   📝 **模型管理**：搜索和查看可用的模型
@@ -56,6 +59,9 @@ http://localhost:3000/init 即可使用。
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
+
+生产入口已通过全新 Python 进程导入和真实容器启动冒烟测试，避免测试环境的模块
+缓存掩盖部署时的循环导入问题。
 
 ### 方法二：直接运行（开发环境）
 
@@ -104,6 +110,17 @@ V2 版本新增了计划管理功能，管理员可以创建不同的用量计�
 -   每天请求限制 (RPD)
 -   默认计划标记
 
+### 可用性筛选与智能路由
+
+端点和模型列表均可按“全部 / 可用 / 不可用”筛选。模型详情中的 BaseURL 还可按
+“全部 / ≥ 10 / ≥ 20 / ≥ 30 TPS”筛选，阈值包含边界值并在分页前应用。列表先显示
+端点与模型状态均可用的 BaseURL，再在各可用性分组内按实测 TPS 从高到低排列。
+
+通过 Ollama 或 OpenAI 兼容 API 发起请求时，服务会同时检查端点状态和端点上的
+模型状态，仅保留两者均可用的候选线路，再按 TPS 从高到低依次尝试，最多选择
+10 条线路。某条线路在响应开始前失败时会自动切换到下一条；流式响应一旦已经
+开始输出，则不会跨端点重放已发送内容。
+
 ### API 使用示例
 
 #### 兼容 Ollama API
@@ -123,7 +140,7 @@ curl -N -X POST http://localhost:3000/v1/chat/completions \
   }'
 ```
 
-Ollama-Hack 支持 Ollama 的全部 OpenAI 兼容 API，详细列表请参考：[Ollama/OpenAI Compability](https://github.com/ollama/ollama/blob/main/docs/openai.md)。
+Ollama-Hack 支持 Ollama 的全部 OpenAI 兼容 API，详细列表请参考：[Ollama/OpenAI Compatibility](https://github.com/ollama/ollama/blob/main/docs/openai.md)。
 
 ## 🔧 配置选项
 
@@ -140,6 +157,8 @@ environment:
     - DATABASE__ENGINE=sqlite
     - DATABASE__DB=/data/ollama-hack.db
 ```
+
+完整变量及默认示例见 [`.env.example`](./.env.example)。
 
 使用外部 PostgreSQL：
 
@@ -177,7 +196,8 @@ environment:
 
 可以选择从
 [Awesome-Ollama-Server](https://github.com/forrany/Awesome-Ollama-Server)
-的公开 JSON 数据源自动发现端点。此功能默认关闭：
+的公开 JSON 数据源自动发现端点。应用内置默认值为关闭；仓库提供的
+`.env.example` 已将其启用，若不需要请设置 `APP__EXTERNAL_FEED_ENABLED=false`：
 
 ```dotenv
 APP__EXTERNAL_FEED_ENABLED=true
@@ -205,6 +225,7 @@ APP__EXTERNAL_FEED_INTERVAL_HOURS=10
 | API Key 近 30 天统计 | 5 次汇总 + 30 次逐日查询，共 35 次 | 1 次条件汇总 + 1 次按日分组，共 2 次 | 统计查询减少 94.3% |
 | 单进程数据库连接上限 | 默认 `50 + 100 = 150` | 默认 `5 + 10 = 15`，可通过环境变量调整 | 峰值连接占用降低 90% |
 | Docker 运行结构 | 前端、后端分别构建和运行 | 单个非 root Uvicorn 镜像同时提供 API 与静态页面 | 本地构建的最终镜像约 67.5 MiB |
+| 模型请求路由 | 未同时校验端点整体状态 | 双重可用性校验，按 TPS 排序并顺序故障切换 | 跳过已知不可用线路，降低首选线路失败概率 |
 
 查询计数测试会持续约束这些结果：端点列表总 SQL 数不超过 5，模型关联计数固定
 为 1，API Key 统计（含权限查询）总 SQL 数不超过 4。SQLite、PostgreSQL 和
