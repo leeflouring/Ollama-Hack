@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Optional
 
 from fastapi_pagination import Page, Params
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.schema import FilterParams
 
@@ -23,6 +23,7 @@ class AIModelFilterParams(FilterParams[AIModelSortField]):
 
 class AIModelWithEndpointRequest(Params):
     ai_model_id: int
+    min_tps: int | None = Field(default=None, ge=10, le=30, multiple_of=10)
 
 
 # AI模型相关的Schema

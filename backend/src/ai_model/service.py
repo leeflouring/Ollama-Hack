@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from fastapi_pagination import Page, Params, set_page
+from fastapi_pagination import Page, set_page
 from fastapi_pagination.ext.sqlmodel import apaginate
 from sqlalchemy import and_, case, exists, func, or_
 from sqlalchemy.orm import selectinload
@@ -215,7 +215,7 @@ async def get_ai_model_by_id(session: DBSessionDep, ai_model_id: int) -> AIModel
 async def get_endpoint_links_by_ai_model_id(
     session: DBSessionDep,
     ai_model_id: int,
-    params: Params = Depends(),
+    params: AIModelWithEndpointRequest = Depends(),
 ) -> Page[EndpointAIModelDB]:
     """
     Get all endpoint links with an AI model.
@@ -235,18 +235,21 @@ async def get_endpoint_links_by_ai_model_id(
         )
         .join(EndpointDB, EndpointDB.id == EndpointAIModelDB.endpoint_id)
         .where(EndpointAIModelDB.ai_model_id == ai_model_id)
-        .order_by(
-            case(
-                (
-                    and_(
-                        EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
-                        EndpointDB.status == EndpointStatusEnum.AVAILABLE,
-                    ),
-                    1,
+    )
+    if params.min_tps is not None:
+        query = query.where(EndpointAIModelDB.token_per_second >= params.min_tps)
+    query = query.order_by(
+        case(
+            (
+                and_(
+                    EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+                    EndpointDB.status == EndpointStatusEnum.AVAILABLE,
                 ),
-                else_=0,
-            ).desc(),
-            col(EndpointAIModelDB.token_per_second).desc(),
-        )
+                1,
+            ),
+            else_=0,
+        ).desc(),
+        col(EndpointAIModelDB.token_per_second).desc(),
+        col(EndpointAIModelDB.endpoint_id),
     )
     return await apaginate(session, query, params)

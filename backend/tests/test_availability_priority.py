@@ -5,15 +5,18 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from fastapi_pagination import Params
+from pydantic import ValidationError
 from sqlalchemy import event
 from starlette.requests import Request
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from src.ai_model.models import AIModelDB, AIModelStatusEnum, EndpointAIModelDB
-from src.ai_model.schemas import AIModelFilterParams
+from src.ai_model.schemas import AIModelFilterParams, AIModelWithEndpointRequest
 from src.ai_model.service import (
+    get_ai_model_with_endpoints,
     get_ai_models,
     get_endpoint_counts,
     get_endpoint_links_by_ai_model_id,
@@ -44,6 +47,16 @@ def test_main_imports_in_fresh_process(tmp_path, monkeypatch):
     assert result.returncode == 0, result.stderr
 
 
+def test_model_detail_min_tps_validation():
+    for min_tps, expected in ((None, None), ("10", 10), ("20", 20), ("30", 30)):
+        params = AIModelWithEndpointRequest(ai_model_id=1, min_tps=min_tps)
+        assert params.min_tps == expected
+
+    for min_tps in ("0", "15", "40", "invalid"):
+        with pytest.raises(ValidationError):
+            AIModelWithEndpointRequest(ai_model_id=1, min_tps=min_tps)
+
+
 def test_sqlite_availability_filters_and_tps_priority(tmp_path):
     async def run():
         config = DatabaseConfig(
@@ -65,10 +78,11 @@ def test_sqlite_availability_filters_and_tps_priority(tmp_path):
 
                 primary = endpoint("primary")
                 secondary = endpoint("secondary")
+                tie = endpoint("tie")
                 down = endpoint("down", EndpointStatusEnum.UNAVAILABLE)
                 fake = endpoint("fake", EndpointStatusEnum.FAKE)
                 routing_endpoints = [endpoint(f"route-{tps}") for tps in range(1, 13)]
-                endpoints = [primary, secondary, down, fake, *routing_endpoints]
+                endpoints = [primary, secondary, tie, down, fake, *routing_endpoints]
 
                 def model(name: str) -> AIModelDB:
                     return AIModelDB(name=name, tag="latest")
@@ -98,6 +112,7 @@ def test_sqlite_availability_filters_and_tps_priority(tmp_path):
                     )
 
                 links = [
+                    link(tie, routable, 30),
                     link(primary, routable, 30),
                     link(secondary, routable, 20),
                     link(down, routable, 200),
@@ -169,7 +184,7 @@ def test_sqlite_availability_filters_and_tps_priority(tmp_path):
                 }
 
                 assert await get_endpoint_counts(session, [routable.id, stale.id]) == {
-                    routable.id: (4, 2),
+                    routable.id: (5, 3),
                     stale.id: (2, 0),
                 }
 
@@ -198,14 +213,94 @@ def test_sqlite_availability_filters_and_tps_priority(tmp_path):
                 ]
 
                 model_links = await get_endpoint_links_by_ai_model_id(
-                    session, routable.id, Params(page=1, size=100)
+                    session,
+                    routable.id,
+                    AIModelWithEndpointRequest(
+                        ai_model_id=routable.id,
+                        page=1,
+                        size=100,
+                    ),
                 )
                 assert [link.endpoint_id for link in model_links.items] == [
                     primary.id,
+                    tie.id,
                     secondary.id,
                     fake.id,
                     down.id,
                 ]
+
+                threshold_page_1 = await get_endpoint_links_by_ai_model_id(
+                    session,
+                    routable.id,
+                    AIModelWithEndpointRequest(
+                        ai_model_id=routable.id,
+                        page=1,
+                        size=2,
+                        min_tps=30,
+                    ),
+                )
+                assert [link.endpoint_id for link in threshold_page_1.items] == [
+                    primary.id,
+                    tie.id,
+                ]
+                assert threshold_page_1.total == 4
+                assert threshold_page_1.pages == 2
+
+                threshold_page_2 = await get_endpoint_links_by_ai_model_id(
+                    session,
+                    routable.id,
+                    AIModelWithEndpointRequest(
+                        ai_model_id=routable.id,
+                        page=2,
+                        size=2,
+                        min_tps=30,
+                    ),
+                )
+                assert [link.endpoint_id for link in threshold_page_2.items] == [
+                    fake.id,
+                    down.id,
+                ]
+                assert threshold_page_2.total == 4
+                assert threshold_page_2.pages == 2
+
+                threshold_20 = await get_endpoint_links_by_ai_model_id(
+                    session,
+                    routable.id,
+                    AIModelWithEndpointRequest(
+                        ai_model_id=routable.id,
+                        page=1,
+                        size=100,
+                        min_tps=20,
+                    ),
+                )
+                assert secondary.id in {link.endpoint_id for link in threshold_20.items}
+
+                threshold_10 = await get_endpoint_links_by_ai_model_id(
+                    session,
+                    secondary_model.id,
+                    AIModelWithEndpointRequest(
+                        ai_model_id=secondary_model.id,
+                        page=1,
+                        size=100,
+                        min_tps=10,
+                    ),
+                )
+                assert [link.endpoint_id for link in threshold_10.items] == [primary.id]
+
+                empty_detail = await get_ai_model_with_endpoints(
+                    session,
+                    AIModelWithEndpointRequest(
+                        ai_model_id=secondary_model.id,
+                        page=1,
+                        size=5,
+                        min_tps=30,
+                    ),
+                )
+                assert empty_detail.endpoints.items == []
+                assert empty_detail.endpoints.total == 0
+                assert empty_detail.endpoints.pages == 0
+                assert empty_detail.total_endpoint_count == 1
+                assert empty_detail.avaliable_endpoint_count == 1
 
                 statements = []
 

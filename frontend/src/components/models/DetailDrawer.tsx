@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Divider } from "@heroui/divider";
 import { Tooltip } from "@heroui/tooltip";
+import { Select, SelectItem } from "@heroui/select";
 import { useState } from "react";
 import { Button } from "@heroui/button";
 
@@ -35,6 +36,7 @@ interface ModelDetailProps {
 const ModelDetailDrawer = ({ id, isOpen, onClose }: ModelDetailProps) => {
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(5);
+  const [minTps, setMinTps] = useState<number>();
 
   // 获取模型详情
   const {
@@ -42,8 +44,8 @@ const ModelDetailDrawer = ({ id, isOpen, onClose }: ModelDetailProps) => {
     isLoading,
     error,
   } = useCustomQuery<AIModelInfoWithEndpoint>(
-    ["model-drawer", id, page, size],
-    () => aiModelApi.getAIModelById(Number(id), page, size),
+    ["model-drawer", id, page, size, minTps],
+    () => aiModelApi.getAIModelById(Number(id), page, size, minTps),
     { staleTime: 30000, enabled: !!id && isOpen },
   );
 
@@ -51,6 +53,27 @@ const ModelDetailDrawer = ({ id, isOpen, onClose }: ModelDetailProps) => {
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
   };
+
+  const tpsFilter = (
+    <Select
+      disallowEmptySelection
+      aria-label="按最低 TPS 筛选 BaseURL"
+      className="w-36"
+      selectedKeys={[minTps === undefined ? "all" : String(minTps)]}
+      size="sm"
+      onChange={(event) => {
+        setMinTps(
+          event.target.value === "all" ? undefined : Number(event.target.value),
+        );
+        setPage(1);
+      }}
+    >
+      <SelectItem key="all">全部</SelectItem>
+      <SelectItem key="10">≥ 10 TPS</SelectItem>
+      <SelectItem key="20">≥ 20 TPS</SelectItem>
+      <SelectItem key="30">≥ 30 TPS</SelectItem>
+    </Select>
+  );
 
   // 格式化日期
   const formatDate = (dateString: string) => {
@@ -211,34 +234,29 @@ const ModelDetailDrawer = ({ id, isOpen, onClose }: ModelDetailProps) => {
             </CardHeader>
             <Divider />
             <CardBody className="p-4">
-              {model.endpoints.items.length === 0 ? (
-                <div className="py-8 text-center">
+              <DataTable
+                columns={columns}
+                data={model.endpoints.items}
+                emptyContent={
                   <p className="text-gray-500 dark:text-gray-400">
-                    没有可用的端点
+                    {minTps === undefined
+                      ? "没有可用的端点"
+                      : `没有达到 ${minTps} TPS 的 BaseURL`}
                   </p>
-                </div>
-              ) : (
-                <DataTable
-                  columns={columns}
-                  data={model.endpoints.items}
-                  emptyContent={
-                    <p className="text-gray-500 dark:text-gray-400">
-                      没有可用的端点
-                    </p>
-                  }
-                  isLoading={isLoading}
-                  page={page}
-                  pages={Math.ceil((model.endpoints.total || 0) / size)}
-                  removeWrapper={true}
-                  renderCell={renderCell}
-                  selectedSize={size}
-                  setSize={setSize}
-                  showCustomPageSize={false}
-                  title="可用端点"
-                  total={model.endpoints.total}
-                  onPageChange={handlePageChange}
-                />
-              )}
+                }
+                isLoading={isLoading}
+                page={page}
+                pages={Math.ceil((model.endpoints.total || 0) / size)}
+                removeWrapper={true}
+                renderCell={renderCell}
+                selectedSize={size}
+                setSize={setSize}
+                showCustomPageSize={false}
+                title="可用端点"
+                topActionContent={tpsFilter}
+                total={model.endpoints.total}
+                onPageChange={handlePageChange}
+              />
             </CardBody>
           </Card>
         </div>
