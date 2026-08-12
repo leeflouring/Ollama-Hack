@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { addToast } from "@heroui/toast";
 import { Key, Selection } from "@heroui/table";
 import { Button } from "@heroui/button";
+import { Select, SelectItem } from "@heroui/select";
 
 import EndpointDetailDrawer from "@/components/endpoints/DetailDrawer";
 import CreateEndpointModal from "@/components/endpoints/CreateModal";
@@ -49,11 +50,13 @@ const EndpointListPage = () => {
     search: searchTerm,
     orderBy,
     order,
+    isAvailable,
     setPage,
     setPageSize,
     setSearch: setSearchTerm,
     setOrderBy,
     setOrder,
+    setCustomParam,
   } = usePaginationUrlState(
     {
       page: 1,
@@ -61,6 +64,7 @@ const EndpointListPage = () => {
       search: "",
       orderBy: "status",
       order: SortOrder.ASC,
+      isAvailable: undefined as boolean | undefined,
     },
     validationConfig,
   );
@@ -107,7 +111,7 @@ const EndpointListPage = () => {
     error: endpointsError,
     refetch,
   } = useCustomQuery<PageResponse<EndpointWithAIModelCount>>(
-    ["endpoints", page, searchTerm, orderBy, order, pageSize],
+    ["endpoints", page, searchTerm, orderBy, order, pageSize, isAvailable],
     () =>
       endpointApi.getEndpoints({
         page,
@@ -115,6 +119,7 @@ const EndpointListPage = () => {
         search: searchTerm,
         order_by: orderBy,
         order,
+        is_available: isAvailable,
       }),
     { staleTime: 30000 },
   );
@@ -155,6 +160,29 @@ const EndpointListPage = () => {
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
   };
+
+  const availabilityFilter = (
+    <Select
+      disallowEmptySelection
+      aria-label="按可用性筛选端点"
+      className="w-32"
+      selectedKeys={[isAvailable === undefined ? "all" : String(isAvailable)]}
+      size="sm"
+      onChange={(event) => {
+        setCustomParam(
+          "isAvailable",
+          event.target.value === "all"
+            ? undefined
+            : event.target.value === "true",
+        );
+        setPage(1);
+      }}
+    >
+      <SelectItem key="all">全部</SelectItem>
+      <SelectItem key="true">可用</SelectItem>
+      <SelectItem key="false">不可用</SelectItem>
+    </Select>
+  );
 
   // 处理选择变化
   const handleSelectionChange = (keys: Set<Key>) => {
@@ -449,6 +477,7 @@ const EndpointListPage = () => {
           setSearchTerm={setSearchTerm}
           setVisibleColumns={setVisibleColumns}
           testingEndpointIds={testingEndpointIds}
+          topActionContent={availabilityFilter}
           totalItems={endpoints?.total}
           totalPages={endpoints?.pages}
           visibleColumns={visibleColumns}

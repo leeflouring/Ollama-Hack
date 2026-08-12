@@ -24,6 +24,8 @@ export interface QueryParams extends PaginationParams {
   search?: string;
   order_by?: string;
   order?: SortOrder;
+  status?: EndpointStatusEnum;
+  is_available?: boolean;
 }
 
 // API 错误响应

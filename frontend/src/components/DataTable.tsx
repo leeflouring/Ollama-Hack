@@ -404,6 +404,7 @@ export const DataTable = <T extends { id?: number | string }>({
     visibleColumns,
     setVisibleColumns,
     addButtonProps,
+    topActionContent,
     autoSearchDelay,
     selectionMode,
     selectedKeys,

@@ -10,6 +10,7 @@ import {
   AIModelInfoWithEndpointCount,
   PlanResponse,
   ApiError,
+  EndpointStatusEnum,
 } from "@/types";
 import DashboardLayout from "@/layouts/Main";
 import ErrorDisplay from "@/components/ErrorDisplay";
@@ -67,7 +68,7 @@ const DashboardPage = () => {
       endpointApi.getEndpoints({
         page: 1,
         size: 1,
-        status: "available",
+        status: EndpointStatusEnum.AVAILABLE,
       }),
     { enabled: true },
   );

@@ -30,6 +30,7 @@ interface ModelTableProps {
   onSearch: (e: React.FormEvent) => void;
   totalPages?: number;
   totalItems?: number;
+  topActionContent?: React.ReactNode;
 }
 
 const ModelTable: React.FC<ModelTableProps> = ({
@@ -50,6 +51,7 @@ const ModelTable: React.FC<ModelTableProps> = ({
   onSearch,
   totalPages,
   totalItems,
+  topActionContent,
 }) => {
   // 获取模型状态
   const getModelStatus = (
@@ -178,6 +180,7 @@ const ModelTable: React.FC<ModelTableProps> = ({
       setSize={setPageSize}
       sortDescriptor={sortDescriptor}
       title="模型列表"
+      topActionContent={topActionContent}
       total={totalItems}
       onPageChange={onPageChange}
       onSearch={onSearch}

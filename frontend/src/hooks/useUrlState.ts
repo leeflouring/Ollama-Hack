@@ -131,6 +131,7 @@ export function usePaginationUrlState<SortType = string>(
     search?: string;
     orderBy?: SortType;
     order?: string;
+    isAvailable?: boolean;
     [key: string]: any;
   },
   validationConfig?: PaginationValidationConfig,

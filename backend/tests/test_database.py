@@ -139,8 +139,16 @@ def test_sqlite_query_optimizations_use_fixed_query_counts(tmp_path):
             await database.create_db_and_tables()
             async with manager.session() as session:
                 endpoints = [
-                    EndpointDB(url="http://one.example", name="one"),
-                    EndpointDB(url="http://two.example", name="two"),
+                    EndpointDB(
+                        url="http://one.example",
+                        name="one",
+                        status=EndpointStatusEnum.AVAILABLE,
+                    ),
+                    EndpointDB(
+                        url="http://two.example",
+                        name="two",
+                        status=EndpointStatusEnum.UNAVAILABLE,
+                    ),
                 ]
                 models = [
                     AIModelDB(name="model-one", tag="latest"),
@@ -243,7 +251,7 @@ def test_sqlite_query_optimizations_use_fixed_query_counts(tmp_path):
                     count_statements,
                 )
                 assert statements == 1
-                assert counts == {model_ids[0]: (2, 2), model_ids[1]: (1, 0)}
+                assert counts == {model_ids[0]: (2, 1), model_ids[1]: (1, 0)}
 
                 statements = 0
                 event.listen(manager._engine.sync_engine, "before_cursor_execute", count_statements)

@@ -23,6 +23,7 @@ from src.utils import now
 from .models import (
     EndpointDB,
     EndpointPerformanceDB,
+    EndpointStatusEnum,
     EndpointTestTask,
 )
 from .schemas import (
@@ -157,6 +158,13 @@ async def get_endpoints(
 
     if params.status:
         query = query.where(EndpointDB.status == params.status)
+
+    if params.is_available is not None:
+        query = query.where(
+            EndpointDB.status == EndpointStatusEnum.AVAILABLE
+            if params.is_available
+            else EndpointDB.status != EndpointStatusEnum.AVAILABLE
+        )
 
     return await apaginate(session, query, params)
 
@@ -410,19 +418,18 @@ async def get_best_endpoints_for_model(
     Get the best endpoint for a model.
     """
     query = (
-        select(EndpointAIModelDB)
-        .options(selectinload(EndpointAIModelDB.endpoint))  # type: ignore
+        select(EndpointDB)
+        .join(EndpointAIModelDB, EndpointAIModelDB.endpoint_id == EndpointDB.id)
         .where(
             EndpointAIModelDB.ai_model_id == model_id,
             EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+            EndpointDB.status == EndpointStatusEnum.AVAILABLE,
         )
+        .order_by(col(EndpointAIModelDB.token_per_second).desc())
+        .limit(10)
     )
-    query = query.order_by(col(EndpointAIModelDB.token_per_second).desc())
     result = await session.execute(query)
-    links = result.scalars().all()
-    if len(links) >= 10:
-        links = links[:10]
-    return [link.endpoint for link in links]
+    return list(result.scalars().all())
 
 
 async def get_ai_model_links_by_endpoint_id(
@@ -440,11 +447,25 @@ async def get_ai_model_links_by_endpoint_id(
     # Base query to get AI models through the association table
     query = (
         select(EndpointAIModelDB)
+        .join(EndpointDB, EndpointDB.id == EndpointAIModelDB.endpoint_id)
         .options(
             selectinload(EndpointAIModelDB.ai_model),  # type: ignore
             selectinload(EndpointAIModelDB.performances),  # type: ignore
         )
         .where(EndpointAIModelDB.endpoint_id == endpoint_id)
+        .order_by(
+            case(
+                (
+                    and_(
+                        EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+                        EndpointDB.status == EndpointStatusEnum.AVAILABLE,
+                    ),
+                    1,
+                ),
+                else_=0,
+            ).desc(),
+            col(EndpointAIModelDB.token_per_second).desc(),
+        )
     )
 
     return await apaginate(session, query, params)

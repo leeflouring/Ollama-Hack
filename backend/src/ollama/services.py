@@ -16,7 +16,7 @@ from src.apikey.service import (
     log_api_key_usage,
 )
 from src.database import DBSessionDep
-from src.endpoint.models import EndpointDB
+from src.endpoint.models import EndpointDB, EndpointStatusEnum
 from src.logging import get_logger
 from src.utils import now
 
@@ -83,9 +83,14 @@ async def get_tags(
     session: DBSessionDep,
 ):
     query = select(AIModelDB.name, AIModelDB.tag)
-    subquery = select(EndpointAIModelDB).where(
-        (EndpointAIModelDB.ai_model_id == AIModelDB.id)
-        & (EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE)
+    subquery = (
+        select(EndpointAIModelDB)
+        .join(EndpointDB, EndpointDB.id == EndpointAIModelDB.endpoint_id)
+        .where(
+            EndpointAIModelDB.ai_model_id == AIModelDB.id,
+            EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+            EndpointDB.status == EndpointStatusEnum.AVAILABLE,
+        )
     )
     query = query.where(exists(subquery))
     result = await session.execute(query)

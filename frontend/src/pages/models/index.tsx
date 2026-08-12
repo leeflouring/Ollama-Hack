@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
+import { Select, SelectItem } from "@heroui/select";
 
 import {
   useCustomQuery,
@@ -33,11 +34,13 @@ export const ModelListPage = () => {
     search: searchTerm,
     orderBy,
     order,
+    isAvailable,
     setPage,
     setPageSize,
     setSearch: setSearchTerm,
     setOrderBy,
     setOrder,
+    setCustomParam,
   } = usePaginationUrlState(
     {
       page: 1,
@@ -45,6 +48,7 @@ export const ModelListPage = () => {
       search: "",
       orderBy: undefined,
       order: undefined,
+      isAvailable: undefined as boolean | undefined,
     },
     validationConfig,
   );
@@ -60,7 +64,7 @@ export const ModelListPage = () => {
     error: modelsError,
     refetch,
   } = useCustomQuery<PageResponse<AIModelInfoWithEndpointCount>>(
-    ["models", page, pageSize, searchTerm, orderBy, order],
+    ["models", page, pageSize, searchTerm, orderBy, order, isAvailable],
     () =>
       aiModelApi.getAIModels({
         page,
@@ -68,6 +72,7 @@ export const ModelListPage = () => {
         search: searchTerm,
         order_by: orderBy,
         order,
+        is_available: isAvailable,
       }),
     { staleTime: 30000 },
   );
@@ -93,6 +98,29 @@ export const ModelListPage = () => {
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
   };
+
+  const availabilityFilter = (
+    <Select
+      disallowEmptySelection
+      aria-label="按可用性筛选模型"
+      className="w-32"
+      selectedKeys={[isAvailable === undefined ? "all" : String(isAvailable)]}
+      size="sm"
+      onChange={(event) => {
+        setCustomParam(
+          "isAvailable",
+          event.target.value === "all"
+            ? undefined
+            : event.target.value === "true",
+        );
+        setPage(1);
+      }}
+    >
+      <SelectItem key="all">全部</SelectItem>
+      <SelectItem key="true">可用</SelectItem>
+      <SelectItem key="false">不可用</SelectItem>
+    </Select>
+  );
 
   // 打开模型详情抽屉
   const openModelDetail = (modelId: number) => {
@@ -120,6 +148,7 @@ export const ModelListPage = () => {
         setOrderBy={setOrderBy}
         setPageSize={setPageSize}
         setSearchTerm={setSearchTerm}
+        topActionContent={availabilityFilter}
         totalItems={models?.total}
         totalPages={models?.pages}
         onOpenModelDetail={openModelDetail}

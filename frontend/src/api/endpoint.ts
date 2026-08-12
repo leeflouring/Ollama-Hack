@@ -24,6 +24,7 @@ export const endpointApi = {
       order_by: params.order_by,
       order: params.order,
       status: params.status,
+      is_available: params.is_available,
     });
 
     return apiClient.get<PageResponse<EndpointWithAIModelCount>>(

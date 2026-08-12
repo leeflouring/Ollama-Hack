@@ -20,6 +20,7 @@ class EndpointSortField(StrEnum):
 
 class EndpointFilterParams(FilterParams[EndpointSortField]):
     status: Optional[EndpointStatusEnum] = None
+    is_available: Optional[bool] = None
 
 
 class EndpointCreate(BaseModel):

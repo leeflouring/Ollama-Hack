@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 
 from src.database import DBSessionDep
+from src.endpoint.models import EndpointDB, EndpointStatusEnum
 from src.schema import SortOrder
 
 from .models import AIModelDB, AIModelStatusEnum, EndpointAIModelDB
@@ -54,12 +55,18 @@ async def get_ai_models(
             order_column = order_column.desc()
         query = query.order_by(order_column)
 
-    if params.is_available:
-        subquery = select(EndpointAIModelDB).where(
-            (EndpointAIModelDB.ai_model_id == AIModelDB.id)
-            & (EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE)
+    if params.is_available is not None:
+        subquery = (
+            select(EndpointAIModelDB)
+            .join(EndpointDB, EndpointDB.id == EndpointAIModelDB.endpoint_id)
+            .where(
+                EndpointAIModelDB.ai_model_id == AIModelDB.id,
+                EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+                EndpointDB.status == EndpointStatusEnum.AVAILABLE,
+            )
         )
-        query = query.where(exists(subquery))
+        routable = exists(subquery)
+        query = query.where(routable if params.is_available else ~routable)
 
     return await apaginate(session, query, params)
 
@@ -76,11 +83,21 @@ async def get_endpoint_counts(
             func.count(),
             func.coalesce(
                 func.sum(
-                    case((EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE, 1), else_=0)
+                    case(
+                        (
+                            and_(
+                                EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+                                EndpointDB.status == EndpointStatusEnum.AVAILABLE,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
                 ),
                 0,
             ),
         )
+        .outerjoin(EndpointDB, EndpointDB.id == EndpointAIModelDB.endpoint_id)
         .where(col(EndpointAIModelDB.ai_model_id).in_(ai_model_ids))
         .group_by(EndpointAIModelDB.ai_model_id)
     )
@@ -211,7 +228,20 @@ async def get_endpoint_links_by_ai_model_id(
             selectinload(EndpointAIModelDB.performances),  # type: ignore
             selectinload(EndpointAIModelDB.endpoint),  # type: ignore
         )
+        .join(EndpointDB, EndpointDB.id == EndpointAIModelDB.endpoint_id)
         .where(EndpointAIModelDB.ai_model_id == ai_model_id)
-        .order_by(col(EndpointAIModelDB.token_per_second).desc())
+        .order_by(
+            case(
+                (
+                    and_(
+                        EndpointAIModelDB.status == AIModelStatusEnum.AVAILABLE,
+                        EndpointDB.status == EndpointStatusEnum.AVAILABLE,
+                    ),
+                    1,
+                ),
+                else_=0,
+            ).desc(),
+            col(EndpointAIModelDB.token_per_second).desc(),
+        )
     )
     return await apaginate(session, query, params)
