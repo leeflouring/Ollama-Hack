@@ -1,5 +1,6 @@
 import asyncio
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,6 +29,19 @@ from src.endpoint.service import (
 )
 from src.ollama import services as ollama_services
 from src.ollama.services import RequestInfo, request_forwarding, send_request_to_endpoints
+
+
+def test_main_imports_in_fresh_process(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATABASE__ENGINE", "sqlite")
+    monkeypatch.setenv("DATABASE__DB", str(tmp_path / "import.db"))
+    result = subprocess.run(
+        [sys.executable, "-c", "import src.main"],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_sqlite_availability_filters_and_tps_priority(tmp_path):

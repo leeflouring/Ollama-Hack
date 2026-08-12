@@ -6,7 +6,6 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 
 from src.database import DBSessionDep
-from src.endpoint.models import EndpointDB, EndpointStatusEnum
 from src.schema import SortOrder
 
 from .models import AIModelDB, AIModelStatusEnum, EndpointAIModelDB
@@ -27,6 +26,8 @@ async def get_ai_models(
     """
     Get all AI models with filtering, searching and sorting.
     """
+    from src.endpoint.models import EndpointDB, EndpointStatusEnum
+
     set_page(Page[AIModelDB])
     query = select(AIModelDB)
 
@@ -76,6 +77,8 @@ async def get_endpoint_counts(
 ) -> dict[int, tuple[int, int]]:
     if not ai_model_ids:
         return {}
+
+    from src.endpoint.models import EndpointDB, EndpointStatusEnum
 
     result = await session.execute(
         select(
@@ -217,6 +220,8 @@ async def get_endpoint_links_by_ai_model_id(
     """
     Get all endpoint links with an AI model.
     """
+    from src.endpoint.models import EndpointDB, EndpointStatusEnum
+
     await get_ai_model_by_id(session, ai_model_id)
 
     set_page(Page[EndpointAIModelDB])
